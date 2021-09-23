@@ -1,7 +1,8 @@
-/**
+/*
+/!**
  * @author     André Storhaug <andr3.storhaug@gmail.com>
  * @copyright  2018 NTNU
- */
+ *!/
 
 
 import {checkForVariable, searchForOccurrence, wrapForTranspilation} from "../../helpers/helpers";
@@ -66,3 +67,4 @@ export function isOneSidedLimit(expression) {
 
     return isOneSided ? side : false;
 }
+*/

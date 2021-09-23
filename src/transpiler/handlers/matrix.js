@@ -1,13 +1,15 @@
-/**
+/*
+*
  * @author     André Storhaug <andr3.storhaug@gmail.com>
  * @copyright  2018 NTNU
- */
 
 
 import {transpiler} from "../maxima-transpiler";
 import {wrapForTranspilation} from "../../helpers/helpers";
 import {assertNotUndefined} from "./common";
+import {Injectable} from "@angular/core";
 
+@Injectable()
 export function handleMatrix(parsedLatex) {
     let matrixString = "";
 
@@ -15,7 +17,6 @@ export function handleMatrix(parsedLatex) {
 
     let matrixArray = [];
     let rowArray = [];
-
     for (let i = 0; i < parsedLatex.length; i++) {
         assertNotUndefined(parsedLatex[i], 'Missing argument in matrix');
         const type = parsedLatex[i].type;
@@ -45,3 +46,4 @@ export function handleMatrix(parsedLatex) {
 
     return matrixString;
 }
+*/

@@ -1,18 +1,19 @@
-/**
+/*
+/!**
  * @author     André Storhaug <andr3.storhaug@gmail.com>
  * @copyright  2018 NTNU
- */
+ *!/
 
 import {transpiler} from "../maxima-transpiler";
 import {wrapForTranspilation} from "../../helpers/helpers";
 import * as logger from "../../logger";
 
-/**
+/!**
  * Will find the length to the end of the integral in the provided tokens array
  * @param  {string} tokens       An array of tokens, starting from where the search should begin
  * @return {Object}             The length from start of provided string,
  *                              to the location of the matching bracket
- */
+ *!/
 export function findIntegralEnd(tokens) {
 
     logger.debug('Finding end of integral');
@@ -85,4 +86,4 @@ export function handleUpperAndLowerArgs(parsedLatex) {
 }
 
 
-// Check which variable that comes after the "d" in f.eks dx. This is the variable to put as integrate arguments. Eg. integrate(2*x, x, 1,2)
+// Check which variable that comes after the "d" in f.eks dx. This is the variable to put as integrate arguments. Eg. integrate(2*x, x, 1,2)*/
