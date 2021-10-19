@@ -1,8 +1,7 @@
-/*
-/!**
+/**
  * @author     André Storhaug <andr3.storhaug@gmail.com>
  * @copyright  2018 NTNU
- *!/
+ */
 import {transpiler} from "../maxima-transpiler";
 import {checkForVariable, wrapForTranspilation} from "../../helpers/helpers";
 import {assertNotUndefined} from "./common";
@@ -56,4 +55,4 @@ export function handleLowerSumArguments(parsedLatex) {
         value: value,
     };
 
-}*/
+}

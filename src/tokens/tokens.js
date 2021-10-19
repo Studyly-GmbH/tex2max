@@ -57,7 +57,7 @@ export const TOKEN_TYPES = {
     NUMBER_LITERAL: {
         name: "NUMBER_LITERAL",
         symbol: null,
-        regex: /^[0-9]+$/i
+        regex: /^[0-9˙]+$/i
     },
     PERIOD: {
         name: "PERIOD",
@@ -77,6 +77,6 @@ export const TOKEN_TYPES = {
     OPERATOR: {
         name: 'OPERATOR',
         symbol: null,
-        regex: /^[+\-*/=^_!]$/i
+        regex: /^[+\-*/=^_!<>]$/i
     },
 };

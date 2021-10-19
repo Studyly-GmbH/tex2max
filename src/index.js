@@ -60,6 +60,10 @@ import {postParse} from "./post-parser";
         this.options = getOptions();
     }
 
+    foo(){
+      return 'parsing to maxima string';
+    }
+
     /**
      * Converts a latex input string to Maxima code.
      * @param  {String} latex The latex to parse
@@ -67,6 +71,7 @@ import {postParse} from "./post-parser";
      */
     toMaxima(latex) {
         setOptions(this.options);
+        console.log('parsing to maxima string');
         let maximaExpression;
 
         this.lastInput = latex;

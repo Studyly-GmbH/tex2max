@@ -487,7 +487,7 @@ export function parseLatex(tokens) {
 
         const token = tokens[index];
 
-        const infix = /^[+\-*/=^_]$/i;
+        const infix = /^[+\-*/=^_<>]$/i;
         const prefix = /^[]$/i;
         const postfix = /^[!]$/i;
 

@@ -165,7 +165,7 @@ export function postParse(parsedLatex) {
             throw new Error('Only one decimal separator is allowed');
         }
 
-        if (peekType(2) === 'number') {
+        if (peekType(2) === 'number' || peekValue(2) === '˙') {
             logger.debug("- Found fractional decimal part\"" + getCurrentValue() + "\", continuing parsing");
             let decimal_separator = peekValue(1);
             float = getCurrentValue() + decimal_separator + peekValue(2);
