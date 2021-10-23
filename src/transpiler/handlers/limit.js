@@ -8,7 +8,7 @@ import {checkForVariable, searchForOccurrence, wrapForTranspilation} from "../..
 import {transpiler} from "../maxima-transpiler";
 import * as logger from "../../logger";
 
-export function handleLimitArguments(limitArgs) {
+/*export function handleLimitArguments(limitArgs) {
 
     if (!checkForVariable(limitArgs[0])) {// Control for several expression before 'to'
         throw new Error('Limit: "From" argument must be a symbol');
@@ -65,4 +65,4 @@ export function isOneSidedLimit(expression) {
     }
 
     return isOneSided ? side : false;
-}
+}*/

@@ -6,11 +6,17 @@
 import {environmentLength} from './handlers/environment';
 import {assertNotUndefined, getExpressionLength} from './handlers/common';
 import {isMacro, MACROS} from '../macros';
-import {handleMatrix} from './handlers/matrix';
-import {buildMaximaFunctionString, stripAllParenthesis, stripParenthesis, wrapForTranspilation} from '../helpers/helpers';
-import {findIntegralEnd, handleUpperAndLowerArgs} from './handlers/integration';
-import {handleLowerSumArguments, handleUpperAndLowerArgsSum} from './handlers/sum';
-import {handleLimitArguments} from './handlers/limit';
+// import {handleMatrix} from './handlers/matrix';
+import {
+  buildMaximaFunctionString,
+  checkForVariable, searchForOccurrence,
+  stripAllParenthesis,
+  stripParenthesis,
+  wrapForTranspilation
+} from '../helpers/helpers';
+/*import {findIntegralEnd, handleUpperAndLowerArgs} from './handlers/integration';*/
+/*import {handleLowerSumArguments, handleUpperAndLowerArgsSum} from './handlers/sum';*/
+/*import {handleLimitArguments, isOneSidedLimit} from './handlers/limit';*/
 import {getOptions} from '../options';
 import * as logger from '../logger';
 import {getName, getSymbol, isGreekLetter} from '../tokens/greek-letters';
@@ -26,585 +32,800 @@ import {isMatrixEnvironment} from '../environments';
  * @return string The string representation of a mathematical expression in Maxima format, derived from LaTeX
  */
 export function transpiler(parsedLatex) {
-    logger.debug('\n------------------ TRANSPILING -> -------------------');
-    const options = getOptions();
+  logger.debug('\n------------------ TRANSPILING -> -------------------');
+  const options = getOptions();
 
-    let transpiledString = '';
-    let index = 0;
+  let transpiledString = '';
+  let index = 0;
 
-    transpiledString += '(';
+  transpiledString += '(';
 
-    for (index; index < parsedLatex.length; index++) {
-        const item = parsedLatex[index];
+  for (index; index < parsedLatex.length; index++) {
+    const item = parsedLatex[index];
 
-        switch (item.type) {
+    switch (item.type) {
 
-            case 'operator':
-                doOperator();
-                break;
-            case 'number':
-                doNumber();
-                break;
-            case 'float':
-                doFloat();
-                break;
-            case 'variable':
-                doVariable();
-                break;
-            case 'group':
-                doGroup();
-                break;
-            case 'token':
-                doToken();
-                break;
-            case 'function':
-                doFunction();
-                break;
-            case 'environment':
-                doEnvironment();
-                break;
-        }
+      case 'operator':
+        doOperator();
+        break;
+      case 'number':
+        doNumber();
+        break;
+      case 'float':
+        doFloat();
+        break;
+      case 'variable':
+        doVariable();
+        break;
+      case 'group':
+        doGroup();
+        break;
+      case 'token':
+        doToken();
+        break;
+      case 'function':
+        doFunction();
+        break;
+      case 'environment':
+        doEnvironment();
+        break;
+    }
 
-        function getCurrentTranspiledString() {
-            return transpiledString.substring(1);
-        }
+    function findIntegralEnd(tokens) {
 
-        /**
-         * Add times ("*") sign to transpiledString. If supplied with obj parameters with
-         * types ex {type: 'function'}, {type: 'operator'}, times sign will not be added.
-         * @param index
-         * @param obj
-         */
-        function addTimesSign(index, ...obj) {
-            let previousToken = parsedLatex[index - 1];
-            let isPass = true;
-            if (index > 0) {
-                obj.forEach(e => {
-                    let allKeysMatch = true;
-                    for (let key in e) {
-                        if (!e.hasOwnProperty(key)) {
-                            continue;
-                        }
-                        if ((previousToken[key] !== e[key])) {
-                            allKeysMatch = false;
-                        }
-                    }
+      logger.debug('Finding end of integral');
+      let integralDepth = 1;
+      let integrationVariable = "";
 
-                    if (allKeysMatch === true) {
-                        isPass = false;
-                    }
-                });
+      for (let i = 0; i < tokens.length; i++) {
 
-                if (options.addTimesSign && isPass) {
-                    logger.debug(
-                        'Adding * before ' + item.type + ': ' + item.value + ', previous item: ' + parsedLatex[index - 1].type);
-                    transpiledString += '*';
-                }
-            }
-        }
+        const char = tokens[i].value;
+        logger.debug('-- Char:' + char);
 
-        // TODO possible move operator checking to post-parser, since this is a parser job.
-        function doOperator() {
-            const previousToken = parsedLatex[index - 1];
+        if (tokens[i].type === 'function' && tokens[i].value === 'integral') {
+          integralDepth++;
+          logger.debug('-- Found starting integral, depth ' + integralDepth)
+        } else if (tokens[i].type === 'variable' && char[0] === "d") {
 
-            if (index === 0 && (item.value === '+')) {
-                logger.debug('Structure starts with +, ignoring');
-            } else if (index === 0 && item.operatorType !== 'prefix' && item.value !== '-') {// TODO add "-" as valid prefix
-                throw new Error('Operator ' + item.value + ' is not an prefix operator');
 
-            } else {
-                if (item.value === '+' || item.value === '-') {
-                    transpiledString += item.value;
+          let regex = /(d)[A-z]/g; // Match integration ends like dx and dy in dxdy
+          let match = char.match(regex);
 
-                } else if (item.operatorType === 'postfix') {
-                    if (previousToken.type !== 'operator') {
-                        transpiledString += item.value;
-                    } else {
-                        throw new Error('Operator ' + item.value + ' has to be an postfix operator');
-                    }
+          if (match !== null && match.length >= 1) {
 
-                } else if (item.operatorType === 'prefix') {
-                    // transpiledString += item.value;
-
-                } else if (item.operatorType === 'infix') {
-
-                    if (previousToken.type !== 'operator' && previousToken.type !== 'operator') {
-                        transpiledString += item.value;
-                    } else {
-                        throw new Error('Operator ' + item.value + ' has to be an infix operator');
-                    }
-                }
+            if (integralDepth === 1) {
+              integrationVariable = char.substring(1);
+              logger.debug('-- Found end of original integral at position ' + i);
+              return {
+                length: i,
+                variable: integrationVariable
+              };
             }
 
-            if ((item.operatorType === 'infix' || item.operatorType === 'prefix') && index === (parsedLatex.length - 1)) {
-                throw new Error('Operator ' + item.value + ' is an invalid end character.');
-            }
+            integralDepth--;
+            logger.debug('-- Found integral end, depth ' + integralDepth)
+          }
+        }
+      }
+
+      throw new Error('No end of integral located');
+    }
+
+    function handleUpperAndLowerArgs(parsedLatex) {
+
+
+      let lowerLimit, upperLimit;
+      let index = 0;
+
+      for (let j = 0; j < 2; j++) {
+        if (parsedLatex[index + j].value === '_') {
+          index++;
+
+          lowerLimit = transpiler(wrapForTranspilation(parsedLatex[index + j]));
+
+        } else if (parsedLatex[index + j].value === '^') {
+
+          index++;
+
+          upperLimit = transpiler(wrapForTranspilation(parsedLatex[index + j]));
+
+        } else {
+          throw new Error('Finite integral must have both upper and lower limits');
+        }
+      }
+
+
+      return {
+        lowerLimit: lowerLimit,
+        upperLimit: upperLimit
+      }
+    }
+
+    function handleLimitArguments(limitArgs) {
+
+      if (!checkForVariable(limitArgs[0])) {// Control for several expression before 'to'
+        throw new Error('Limit: "From" argument must be a symbol');
+      } else if (!searchForOccurrence(limitArgs[1], 'value', 'to', false).isPresent) {
+        throw new Error('Limit: no "to" token provided')
+      } else if (limitArgs[2] === undefined) {
+        throw new Error('Limit: "To" argument missing')
+      }
+
+      let variable = limitArgs[0].value;
+      let upperLim = limitArgs.slice(2);
+      let value = "";
+
+      value += transpiler(wrapForTranspilation(upperLim));
+
+      let direction = isOneSidedLimit(limitArgs.slice(2));
+
+      return {
+        variable: variable,
+        value: value,
+        direction: direction
+      };
+    }
+
+    function isOneSidedLimit(expression) {
+      logger.debug('Checking if limit is one sided');
+
+      let isOneSided = false;
+      let sideSymbol = '';
+      let side = '';
+
+      for (let i = 0; i < expression.length; i++) {
+        if (expression[i].type === 'group') {
+          let isOneSidedGroup = isOneSidedLimit(expression[i].value);
+
+          if (isOneSidedGroup !== false) {
+            isOneSided = true;
+            side = isOneSidedGroup;
+          }
+        }
+        if ((expression[i].value === '+' || expression[i].value === '-') && (i + 1) >= expression.length) {
+          isOneSided = true;
+          sideSymbol = expression[i].value;
+
+        }
+      }
+
+      if (isOneSided) {
+        side = sideSymbol === '+' ? 'plus' : 'minus';
+        logger.debug('- Limit is one-sided from the ' + side + ' side');
+      } else {
+        logger.debug('- Limit is not one-sided');
+      }
+
+      return isOneSided ? side : false;
+    }
+
+    function handleMatrix(parsedLatex) {
+      let matrixString = "";
+
+      matrixString += 'matrix(';
+
+      let matrixArray = [];
+      let rowArray = [];
+      for (let i = 0; i < parsedLatex.length; i++) {
+        assertNotUndefined(parsedLatex[i], 'Missing argument in matrix');
+        const type = parsedLatex[i].type;
+
+        if (type === 'DOUBLE_BACKSLASH') { // New row
+          matrixArray.push(rowArray);
+          rowArray = []; // Reset array
+        } else {
+          rowArray.push(transpiler(wrapForTranspilation(parsedLatex[i])));
+        }
+      }
+      matrixArray.push(rowArray); // Push last row
+
+      let matrixRowSize = matrixArray[0].length;
+
+      for (let row = 0; row < matrixArray.length; row++) {
+        if (matrixArray[row].length !== matrixRowSize) {
+          throw new Error('All rows in matrix must be the same length');
         }
 
-        function doNumber() {
-            addTimesSign(index, {type: 'number'}, {type: 'float'}, {type: 'operator', operatorType: 'infix'});
+        if (row !== 0) {
+          matrixString += ',';
+        }
+        matrixString += '[' + matrixArray[row].toString() + ']'
+      }
+      matrixString += ')';
+
+      return matrixString;
+    }
+
+    function handleUpperAndLowerArgsSum(parsedLatex) {
+      let lowerLimit, upperLimit;
+      let index = 0;
+
+      for (let j = 0; j < 2; j++) {
+        if (parsedLatex[index + j].value === '_') {
+          index++;
+          lowerLimit = parsedLatex[index + j];
+
+        } else if (parsedLatex[index + j].value === '^') {
+          index++;
+          upperLimit = transpiler(wrapForTranspilation(parsedLatex[index + j]));
+
+        } else {
+          throw new Error('Finite integral must have both upper and lover limits');
+        }
+      }
+
+      return {
+        lowerLimit: lowerLimit,
+        upperLimit: upperLimit
+      }
+    }
+
+    function handleLowerSumArguments(parsedLatex) {
+
+      assertNotUndefined(parsedLatex[0], 'Missing index');
+      const indexVariable = parsedLatex[0];
+
+      assertNotUndefined(parsedLatex[1], 'Index must be assigned. Missing equal sign');
+      const equalSign = parsedLatex[1].value;
+
+      if (!checkForVariable(indexVariable)) {
+        throw new Error('Index must be a variable');
+      } else if (equalSign !== '=') {
+        throw new Error('Index must be assigned. Missing equal sign');
+      }
+
+      let upperLim = parsedLatex.slice(2);
+      let value = "";
+
+      value += transpiler(wrapForTranspilation(upperLim));
+
+      return {
+        variable: indexVariable.value,
+        value: value,
+      };
+
+    }
+
+    function getCurrentTranspiledString() {
+      return transpiledString.substring(1);
+    }
+
+    /**
+     * Add times ("*") sign to transpiledString. If supplied with obj parameters with
+     * types ex {type: 'function'}, {type: 'operator'}, times sign will not be added.
+     * @param index
+     * @param obj
+     */
+    function addTimesSign(index, ...obj) {
+      let previousToken = parsedLatex[index - 1];
+      let isPass = true;
+      if (index > 0) {
+        obj.forEach(e => {
+          let allKeysMatch = true;
+          for (let key in e) {
+            if (!e.hasOwnProperty(key)) {
+              continue;
+            }
+            if ((previousToken[key] !== e[key])) {
+              allKeysMatch = false;
+            }
+          }
+
+          if (allKeysMatch === true) {
+            isPass = false;
+          }
+        });
+
+        if (options.addTimesSign && isPass) {
+          logger.debug(
+            'Adding * before ' + item.type + ': ' + item.value + ', previous item: ' + parsedLatex[index - 1].type);
+          transpiledString += '*';
+        }
+      }
+    }
+
+    // TODO possible move operator checking to post-parser, since this is a parser job.
+    function doOperator() {
+      const previousToken = parsedLatex[index - 1];
+
+      if (index === 0 && (item.value === '+')) {
+        logger.debug('Structure starts with +, ignoring');
+      } else if (index === 0 && item.operatorType !== 'prefix' && item.value !== '-') {// TODO add "-" as valid prefix
+        throw new Error('Operator ' + item.value + ' is not an prefix operator');
+
+      } else {
+        if (item.value === '+' || item.value === '-') {
+          transpiledString += item.value;
+
+        } else if (item.operatorType === 'postfix') {
+          if (previousToken.type !== 'operator') {
             transpiledString += item.value;
+          } else {
+            throw new Error('Operator ' + item.value + ' has to be an postfix operator');
+          }
+
+        } else if (item.operatorType === 'prefix') {
+          // transpiledString += item.value;
+
+        } else if (item.operatorType === 'infix') {
+
+          if (previousToken.type !== 'operator' && previousToken.type !== 'operator') {
+            transpiledString += item.value;
+          } else {
+            throw new Error('Operator ' + item.value + ' has to be an infix operator');
+          }
         }
-
-        function doFloat() {
-            addTimesSign(index, {type: 'number'}, {type: 'float'}, {type: 'operator', operatorType: 'infix'});
-            let float = item.value.replace(",", ".");
-            transpiledString += float;
-        }
-
-        function doVariable() {
-            let variableString = '';
-            addTimesSign(index, {type: 'operator', operatorType: 'infix'});
-
-            if (getName(item.value) !== null) {
-                let letter = getName(item.value);
-                if (options.onlyGreekSymbol) {
-                    letter = getSymbol(letter);
-                }
-                logger.debug('greek letter ' + letter);
-                variableString += letter;
-            } else {
-                variableString += item.value;
-            }
-
-            transpiledString += variableString;
-        }
-
-        function doGroup() {
-            let groupString = '';
-
-            addTimesSign(index, {type: 'function'}, {type: 'operator'});
-
-            groupString += transpiler(item.value);
-
-            if (item.symbol === 'vertical_bar') {
-                groupString = stripParenthesis(groupString);
-            }
-
-            transpiledString += groupString;
-
-        }
-
-        function doToken() {
-
-            logger.debug('Handling token: ' + item.value);
-
-            let tokenString = '';
-            let startIndex = index;
-
-            if (getSymbol(item.value) !== null) {
-                // Token is greek letter name
-                let letter = item.value;
-                if (options.onlyGreekSymbol) {
-                    letter = getSymbol(letter);
-                }
-                logger.debug('greek letter ' + letter);
-                tokenString += letter;
-            }
-
-            if (getName(item.value) !== null) {
-                // Token is greek letter symbol
-                let letter = item.value;
-                if (options.onlyGreekName) {
-                    letter = getName(letter);
-                }
-                logger.debug('greek letter ' + letter);
-                tokenString += letter;
-            }
-
-            if (isMacro(item.value)) {
-                let macro = MACROS.get(item.value);
-                if (macro === null) {
-                    logger.debug('Skipping macro ' + item.value);
-                } else if (macro !== undefined) {
-                    logger.debug('Adding macro ' + macro);
-                    tokenString += macro;
-                }
-            }
-
-            // Handle fraction
-            if (item.value === 'frac') {
-                if (parsedLatex[index + 1].type === 'group' && parsedLatex[index + 2].type === 'group') {
-                    logger.debug('Found fraction');
-                    tokenString += '(';
-                    tokenString += transpiler(parsedLatex[index + 1].value) + '/' + transpiler(parsedLatex[index + 2].value);
-                    tokenString += ')';
-                    index += 2;
-                } else {
-                    throw new Error('Fraction must have 2 following parameters');
-                }
-            }
-
-            if (startIndex > 0 && tokenString !== '' && (isMacro(item.value) || isGreekLetter(item.value))) {
-                addTimesSign(startIndex, {type: 'operator'});
-            }
-
-            transpiledString += tokenString;
-        }
-
-        function doFunction() {
-
-            addTimesSign(index, {type: 'operator'});
-
-            const nextItem = parsedLatex[index + 1];
-
-            if (item.value === 'sqrt') {
-                if (parsedLatex[index + 1].type === 'group') {
-                    let sqrtString = '';
-                    if (parsedLatex[index + 1].symbol === 'square' && parsedLatex[index + 2].type === 'group') {
-                        logger.debug('Found function nth-square root');
-                        let nthArgString = transpiler(parsedLatex[index + 1].value);
-
-                        sqrtString += transpiler(parsedLatex[index + 2].value);
-                        sqrtString += '^(1/' + nthArgString + ')';
-                        index++;
-
-                    } else {
-                        transpiledString += item.value;
-                        logger.debug('Found function square root');
-                        sqrtString += transpiler(parsedLatex[index + 1].value);
-
-                    }
-
-                    transpiledString += sqrtString;
-                    index++;
-                } else {
-                    throw new Error('Square root must be followed by [] or {}');
-                }
-            } else if (item.value === 'lim') {
-                logger.debug('Found function "limit"');
-                handleLimit();
-
-            } else if (item.value === 'binom') {
-                logger.debug('Found function "binomial"');
-                handleBinomial();
-
-            } else if (item.value === 'sum') {
-                logger.debug('Found function "sum"');
-                handleSum();
-
-            } else if (item.value === 'integral') {
-                logger.debug('Found function "integral"');
-                handleIntegral();
-
-            } else if (item.value === 'abs') {
-                logger.debug('Found function "abs"');
-                handleAbs();
-
-            } else if (isTrigonometricFunction(item.value)) {
-                logger.debug('Found trigonometric function "' + item.value + '"');
-                handleTrig();
-
-            } else {
-                logger.debug('Found normal "function"');
-                handleNormalFunction();
-
-            }
-
-            function handleNormalFunction() {
-                let expression = '';
-                let func = item.value;
-
-                assertNotUndefined(parsedLatex[index + 1], 'Missing argument in function: ' + func);
-                expression += func;
-                index++;
-
-                if (parsedLatex[index].type === 'group') {
-                    expression += transpiler(parsedLatex[index].value);
-                    index++;
-
-                } else if (parsedLatex[index].type === 'function') {
-                    let {expressionLength} = getExpressionLength(parsedLatex.slice((index + 1)), ['function'], ['+', '-', '+-']);
-                    expressionLength += 1;
-
-                    expression += transpiler(wrapForTranspilation(parsedLatex.slice(index, (index + expressionLength))));
-                    index += expressionLength - 1;
-
-                } else {
-                    let latexSlice = parsedLatex.slice(index);
-
-                    let i;
-                    for (i = 0; i < latexSlice.length; i++) {
-                        if (latexSlice[i].type !== 'variable' && (latexSlice[i].type !== 'number' ||  latexSlice[i].type !== 'float')) {
-                            break;
-                        }
-                    }
-
-                    let expressionLength = i;
-                    expression += transpiler(wrapForTranspilation(parsedLatex.slice(index, (index + expressionLength))));
-                    index += expressionLength - 1;
-                }
-
-                transpiledString += expression;
-            }
-
-            function handleTrig() {
-                let expression = '';
-                let exponentiate = false;
-                let exponent;
-
-                let func = item.value;
-
-                assertNotUndefined(parsedLatex[index + 1], 'Missing argument in function: ' + func);
-
-                if (parsedLatex[index + 1].value === '^') {
-                    exponentiate = true;
-                    assertNotUndefined(parsedLatex[index + 2], 'Missing argument in function: ' + func + '^');
-
-                    exponent = transpiler(wrapForTranspilation(parsedLatex[index + 2]));
-                    exponent = stripParenthesis(exponent);
-
-                    if (stripAllParenthesis(exponent) === '-1') {
-                        logger.debug('Function is inverse');
-                        exponentiate = false;
-
-                        let inverseFunc = getInverseTrigonometricFunction(func);
-                        if (inverseFunc !== null) {
-                            func = inverseFunc;
-                        } else {
-                            throw new Error('No inverse trigonometric function found for ' + func);
-                        }
-                    }
-                    index += 2;
-                }
-
-                expression += func;
-
-                if (exponentiate) {
-                    assertNotUndefined(parsedLatex[index + 1],
-                        'Missing argument in function: ' + func + '^' + transpiler(wrapForTranspilation(parsedLatex[index])));
-                } else {
-                    assertNotUndefined(parsedLatex[index + 1], 'Missing argument in function: ' + func);
-                }
-
-                if (parsedLatex[index + 1].type === 'group') {
-                    expression += transpiler(parsedLatex[index + 1].value);
-
-                } else if (parsedLatex[index + 1].type === 'function') {
-                    let {expressionLength} = getExpressionLength(parsedLatex.slice((index + 2)), ['function'], ['+', '-', '+-']);
-                    expressionLength += 1;
-
-                    expression += transpiler(
-                        wrapForTranspilation(parsedLatex.slice((index + 1), ((index + 1) + expressionLength))));
-                    index += expressionLength - 1;
-
-                } else {
-                    let {expressionLength} = getExpressionLength(parsedLatex.slice((index + 1)), ['function'], ['+', '-', '+-']);
-                    expression += transpiler(
-                        wrapForTranspilation(parsedLatex.slice((index + 1), ((index + 1) + expressionLength))));
-                    index += expressionLength - 1;
-                }
-
-                if (exponentiate) {
-                    expression = '(' + expression + ')' + '^' + exponent;
-                }
-
-                index++;
-
-                transpiledString += expression;
-            }
-
-            function handleAbs() {
-                let expression = '';
-                let func = item.value;
-                expression += func;
-                expression += transpiler(wrapForTranspilation(parsedLatex[index + 1]));
-
-                index++;
-
-                transpiledString += expression;
-
-            }
-
-            function handleBinomial() {
-                // TODO doesn't handle \binom234 as 2 and 3 needs to be parsed as single digits... this is a parser problem...
-                let binomialString = '';
-                let expression1 = '';
-                let expression2 = '';
-
-                let expr1 = parsedLatex[index + 1].type;
-                let expr2 = parsedLatex[index + 2].type;
-
-                if (expr1 === 'group' && expr2 === 'group') {
-                    expression1 += transpiler(parsedLatex[index + 1].value);
-                    expression2 += transpiler(parsedLatex[index + 2].value);
-                } else {
-                    throw new Error('Binomial must have 2 following groups');
-                }
-
-                binomialString += buildMaximaFunctionString(
-                    'binomial', expression1, expression2,
-                );
-
-                transpiledString += binomialString;
-                index += 2;
-            }
-
-            function handleLimit() {
-                // TODO: review: first arg in limit isn't recognized if it is a multi char variable and onlySingleVariables option
-                // is true
-
-                let limitString = '';
-                let expression = '';
-
-                if (parsedLatex[index + 1].value === '_' && parsedLatex[index + 2].type === 'group') {
-                    let limitArgs = parsedLatex[index + 2].value;
-                    limitArgs = handleLimitArguments(limitArgs);
-
-                    if (typeof parsedLatex[index + 3] !== 'undefined') {
-                        let {expressionLength: limitLength} = getExpressionLength(parsedLatex.slice((index + 3)), [],
-                            ['+', '-', '+-']);
-
-                        expression += transpiler(parsedLatex.slice((index + 3), ((index + 3) + limitLength)));
-                        index += (limitLength - 1);
-
-                    } else {
-                        throw new Error('Missing argument in limit');
-                    }
-
-                    limitString = buildMaximaFunctionString(
-                        'limit', expression, limitArgs.variable, limitArgs.value, limitArgs.direction,
-                    );
-
-                    index += 3;
-
-                } else {
-                    throw new Error('Limit must have a "from" and "to" value');
-                }
-                transpiledString += limitString;
-            }
-
-            function handleSum() {
-                let sumString = '';
-                let expression = '';
-                let lowerArgAssignment, upperArg;
-                let indexVariable = '';
-
-                if (parsedLatex[index + 1].value !== '_' && parsedLatex[index + 1].value !== '^') {
-                    throw new Error('Sum does not contain the correct number of arguments');
-
-                } else {
-                    let integrationLimits = handleUpperAndLowerArgsSum(parsedLatex.slice((index + 1)));
-                    let lowerArg = integrationLimits.lowerLimit.value;
-                    upperArg = integrationLimits.upperLimit;
-                    index += 4;
-
-                    lowerArg = handleLowerSumArguments(lowerArg);
-                    indexVariable = lowerArg.variable;
-                    lowerArgAssignment = lowerArg.value;
-
-                    logger.debug('Sum: arguments are form ' + lowerArgAssignment + ' to ' + upperArg);
-                }
-
-                if (typeof parsedLatex[index + 1] !== 'undefined') {
-                    let {expressionLength: sumLength} = getExpressionLength(parsedLatex.slice((index + 1)), [], ['+', '-', '+-']);
-
-                    expression += transpiler(parsedLatex.slice((index + 1), ((index + 1) + sumLength)));
-                    index += (sumLength);
-
-                } else {
-                    throw new Error('Missing argument in sum');
-                }
-
-                sumString += buildMaximaFunctionString(
-                    'sum', expression, indexVariable, lowerArgAssignment, upperArg,
-                );
-
-                transpiledString += sumString;
-            }
-
-            function handleIntegral() {
-                let integralString = '';
-                let expression = '';
-                let lowerLimit, upperLimit;
-                let integrationVariable = '';
-                let integralLength;
-                let isSymbolic = false;
-
-                assertNotUndefined(parsedLatex[index + 1], 'Missing argument in integral');
-
-                if (parsedLatex[index + 1].value !== '_' && parsedLatex[index + 1].value !== '^') {
-                    // Symbolic integral
-                    logger.debug('Integral is symbolic');
-                    isSymbolic = true;
-
-                    index++;
-
-                } else {
-                    // Finite integral
-                    let integralArgs = parsedLatex.slice(index + 1, index + 5);
-                    let integrationLimits = handleUpperAndLowerArgs(integralArgs);
-                    lowerLimit = integrationLimits.lowerLimit;
-                    upperLimit = integrationLimits.upperLimit;
-                    logger.debug('Integration limits are from ' + lowerLimit + ' to ' + upperLimit);
-
-                    index += 5;
-                }
-
-                let integralEnd = findIntegralEnd(parsedLatex.slice(index));
-
-                integrationVariable += integralEnd.variable;
-                integralLength = integralEnd.length;
-
-                let unTranspiledIntegralLatex = parsedLatex.slice((index), ((index) + integralLength));
-                assertNotUndefined(unTranspiledIntegralLatex[unTranspiledIntegralLatex.length - 1], 'Missing argument in integral');
-
-                if (unTranspiledIntegralLatex[unTranspiledIntegralLatex.length - 1].value === '*') {
-                    unTranspiledIntegralLatex.splice(-1, 1);
-                }
-
-                expression += transpiler(unTranspiledIntegralLatex);
-
-                index += (integralLength);
-
-                if (isSymbolic) {
-                    integralString += buildMaximaFunctionString(
-                        'integrate', expression, integrationVariable,
-                    );
-
-                } else {
-                    integralString += buildMaximaFunctionString(
-                        'integrate', expression, integrationVariable, lowerLimit, upperLimit,
-                    );
-
-                }
-
-                transpiledString += integralString;
-            }
-
-        }
-
-        function doEnvironment() {
-            if (item.state === 'begin') {
-
-                addTimesSign(index, {type: 'operator'});
-
-                let expression = '';
-                let envLength = environmentLength(parsedLatex.slice((index)));
-
-                if (isMatrixEnvironment(item.value)) {
-                    logger.debug('Found matrix environment');
-                    expression += handleMatrix(parsedLatex.slice((index + 1), (index + 1) + envLength));
-                }
-
-                index += (envLength + 1);
-                transpiledString += expression;
-
-            } else if (item.state === 'end') {
-                index++;
-            }
-        }
+      }
+
+      if ((item.operatorType === 'infix' || item.operatorType === 'prefix') && index === (parsedLatex.length - 1)) {
+        throw new Error('Operator ' + item.value + ' is an invalid end character.');
+      }
     }
 
-    transpiledString += ')';
-
-    if (/(\([ ]*\))/.test(transpiledString)) {
-        throw new Error('Syntax error');
+    function doNumber() {
+      addTimesSign(index, {type: 'number'}, {type: 'float'}, {type: 'operator', operatorType: 'infix'});
+      transpiledString += item.value;
     }
 
-    if (transpiledString === '') {
-        throw new Error('EMPTY');
-    } //TODO FIX, possibly remove
+    function doFloat() {
+      addTimesSign(index, {type: 'number'}, {type: 'float'}, {type: 'operator', operatorType: 'infix'});
+      let float = item.value.replace(",", ".");
+      transpiledString += float;
+    }
 
-    return transpiledString;
+    function doVariable() {
+      let variableString = '';
+      addTimesSign(index, {type: 'operator', operatorType: 'infix'});
+
+      if (getName(item.value) !== null) {
+        let letter = getName(item.value);
+        if (options.onlyGreekSymbol) {
+          letter = getSymbol(letter);
+        }
+        logger.debug('greek letter ' + letter);
+        variableString += letter;
+      } else {
+        variableString += item.value;
+      }
+
+      transpiledString += variableString;
+    }
+
+    function doGroup() {
+      let groupString = '';
+
+      addTimesSign(index, {type: 'function'}, {type: 'operator'});
+
+      groupString += transpiler(item.value);
+
+      if (item.symbol === 'vertical_bar') {
+        groupString = stripParenthesis(groupString);
+      }
+
+      transpiledString += groupString;
+
+    }
+
+    function doToken() {
+
+      logger.debug('Handling token: ' + item.value);
+
+      let tokenString = '';
+      let startIndex = index;
+
+      if (getSymbol(item.value) !== null) {
+        // Token is greek letter name
+        let letter = item.value;
+        if (options.onlyGreekSymbol) {
+          letter = getSymbol(letter);
+        }
+        logger.debug('greek letter ' + letter);
+        tokenString += letter;
+      }
+
+      if (getName(item.value) !== null) {
+        // Token is greek letter symbol
+        let letter = item.value;
+        if (options.onlyGreekName) {
+          letter = getName(letter);
+        }
+        logger.debug('greek letter ' + letter);
+        tokenString += letter;
+      }
+
+      if (isMacro(item.value)) {
+        let macro = MACROS.get(item.value);
+        if (macro === null) {
+          logger.debug('Skipping macro ' + item.value);
+        } else if (macro !== undefined) {
+          logger.debug('Adding macro ' + macro);
+          tokenString += macro;
+        }
+      }
+
+      // Handle fraction
+      if (item.value === 'frac') {
+        if (parsedLatex[index + 1].type === 'group' && parsedLatex[index + 2].type === 'group') {
+          logger.debug('Found fraction');
+          tokenString += '(';
+          tokenString += transpiler(parsedLatex[index + 1].value) + '/' + transpiler(parsedLatex[index + 2].value);
+          tokenString += ')';
+          index += 2;
+        } else {
+          throw new Error('Fraction must have 2 following parameters');
+        }
+      }
+
+      if (startIndex > 0 && tokenString !== '' && (isMacro(item.value) || isGreekLetter(item.value))) {
+        addTimesSign(startIndex, {type: 'operator'});
+      }
+
+      transpiledString += tokenString;
+    }
+
+    function doFunction() {
+
+      addTimesSign(index, {type: 'operator'});
+
+      const nextItem = parsedLatex[index + 1];
+
+      if (item.value === 'sqrt') {
+        if (parsedLatex[index + 1].type === 'group') {
+          let sqrtString = '';
+          if (parsedLatex[index + 1].symbol === 'square' && parsedLatex[index + 2].type === 'group') {
+            logger.debug('Found function nth-square root');
+            let nthArgString = transpiler(parsedLatex[index + 1].value);
+
+            sqrtString += transpiler(parsedLatex[index + 2].value);
+            sqrtString += '^(1/' + nthArgString + ')';
+            index++;
+
+          } else {
+            transpiledString += item.value;
+            logger.debug('Found function square root');
+            sqrtString += transpiler(parsedLatex[index + 1].value);
+
+          }
+
+          transpiledString += sqrtString;
+          index++;
+        } else {
+          throw new Error('Square root must be followed by [] or {}');
+        }
+      } else if (item.value === 'lim') {
+        logger.debug('Found function "limit"');
+        handleLimit();
+
+      } else if (item.value === 'binom') {
+        logger.debug('Found function "binomial"');
+        handleBinomial();
+
+      } else if (item.value === 'sum') {
+        logger.debug('Found function "sum"');
+        handleSum();
+
+      } else if (item.value === 'integral') {
+        logger.debug('Found function "integral"');
+        handleIntegral();
+
+      } else if (item.value === 'abs') {
+        logger.debug('Found function "abs"');
+        handleAbs();
+
+      } else if (isTrigonometricFunction(item.value)) {
+        logger.debug('Found trigonometric function "' + item.value + '"');
+        handleTrig();
+
+      } else {
+        logger.debug('Found normal "function"');
+        handleNormalFunction();
+
+      }
+
+      function handleNormalFunction() {
+        let expression = '';
+        let func = item.value;
+
+        assertNotUndefined(parsedLatex[index + 1], 'Missing argument in function: ' + func);
+        expression += func;
+        index++;
+
+        if (parsedLatex[index].type === 'group') {
+          expression += transpiler(parsedLatex[index].value);
+          index++;
+
+        } else if (parsedLatex[index].type === 'function') {
+          let {expressionLength} = getExpressionLength(parsedLatex.slice((index + 1)), ['function'], ['+', '-', '+-']);
+          expressionLength += 1;
+
+          expression += transpiler(wrapForTranspilation(parsedLatex.slice(index, (index + expressionLength))));
+          index += expressionLength - 1;
+
+        } else {
+          let latexSlice = parsedLatex.slice(index);
+
+          let i;
+          for (i = 0; i < latexSlice.length; i++) {
+            if (latexSlice[i].type !== 'variable' && (latexSlice[i].type !== 'number' || latexSlice[i].type !== 'float')) {
+              break;
+            }
+          }
+
+          let expressionLength = i;
+          expression += transpiler(wrapForTranspilation(parsedLatex.slice(index, (index + expressionLength))));
+          index += expressionLength - 1;
+        }
+
+        transpiledString += expression;
+      }
+
+      function handleTrig() {
+        let expression = '';
+        let exponentiate = false;
+        let exponent;
+
+        let func = item.value;
+
+        assertNotUndefined(parsedLatex[index + 1], 'Missing argument in function: ' + func);
+
+        if (parsedLatex[index + 1].value === '^') {
+          exponentiate = true;
+          assertNotUndefined(parsedLatex[index + 2], 'Missing argument in function: ' + func + '^');
+
+          exponent = transpiler(wrapForTranspilation(parsedLatex[index + 2]));
+          exponent = stripParenthesis(exponent);
+
+          if (stripAllParenthesis(exponent) === '-1') {
+            logger.debug('Function is inverse');
+            exponentiate = false;
+
+            let inverseFunc = getInverseTrigonometricFunction(func);
+            if (inverseFunc !== null) {
+              func = inverseFunc;
+            } else {
+              throw new Error('No inverse trigonometric function found for ' + func);
+            }
+          }
+          index += 2;
+        }
+
+        expression += func;
+
+        if (exponentiate) {
+          assertNotUndefined(parsedLatex[index + 1],
+            'Missing argument in function: ' + func + '^' + transpiler(wrapForTranspilation(parsedLatex[index])));
+        } else {
+          assertNotUndefined(parsedLatex[index + 1], 'Missing argument in function: ' + func);
+        }
+
+        if (parsedLatex[index + 1].type === 'group') {
+          expression += transpiler(parsedLatex[index + 1].value);
+
+        } else if (parsedLatex[index + 1].type === 'function') {
+          let {expressionLength} = getExpressionLength(parsedLatex.slice((index + 2)), ['function'], ['+', '-', '+-']);
+          expressionLength += 1;
+
+          expression += transpiler(
+            wrapForTranspilation(parsedLatex.slice((index + 1), ((index + 1) + expressionLength))));
+          index += expressionLength - 1;
+
+        } else {
+          let {expressionLength} = getExpressionLength(parsedLatex.slice((index + 1)), ['function'], ['+', '-', '+-']);
+          expression += transpiler(
+            wrapForTranspilation(parsedLatex.slice((index + 1), ((index + 1) + expressionLength))));
+          index += expressionLength - 1;
+        }
+
+        if (exponentiate) {
+          expression = '(' + expression + ')' + '^' + exponent;
+        }
+
+        index++;
+
+        transpiledString += expression;
+      }
+
+      function handleAbs() {
+        let expression = '';
+        let func = item.value;
+        expression += func;
+        expression += transpiler(wrapForTranspilation(parsedLatex[index + 1]));
+
+        index++;
+
+        transpiledString += expression;
+
+      }
+
+      function handleBinomial() {
+        // TODO doesn't handle \binom234 as 2 and 3 needs to be parsed as single digits... this is a parser problem...
+        let binomialString = '';
+        let expression1 = '';
+        let expression2 = '';
+
+        let expr1 = parsedLatex[index + 1].type;
+        let expr2 = parsedLatex[index + 2].type;
+
+        if (expr1 === 'group' && expr2 === 'group') {
+          expression1 += transpiler(parsedLatex[index + 1].value);
+          expression2 += transpiler(parsedLatex[index + 2].value);
+        } else {
+          throw new Error('Binomial must have 2 following groups');
+        }
+
+        binomialString += buildMaximaFunctionString(
+          'binomial', expression1, expression2,
+        );
+
+        transpiledString += binomialString;
+        index += 2;
+      }
+
+      function handleLimit() {
+        // TODO: review: first arg in limit isn't recognized if it is a multi char variable and onlySingleVariables option
+        // is true
+
+        let limitString = '';
+        let expression = '';
+
+        if (parsedLatex[index + 1].value === '_' && parsedLatex[index + 2].type === 'group') {
+          let limitArgs = parsedLatex[index + 2].value;
+          limitArgs = handleLimitArguments(limitArgs);
+
+          if (typeof parsedLatex[index + 3] !== 'undefined') {
+            let {expressionLength: limitLength} = getExpressionLength(parsedLatex.slice((index + 3)), [],
+              ['+', '-', '+-']);
+
+            expression += transpiler(parsedLatex.slice((index + 3), ((index + 3) + limitLength)));
+            index += (limitLength - 1);
+
+          } else {
+            throw new Error('Missing argument in limit');
+          }
+
+          limitString = buildMaximaFunctionString(
+            'limit', expression, limitArgs.variable, limitArgs.value, limitArgs.direction,
+          );
+
+          index += 3;
+
+        } else {
+          throw new Error('Limit must have a "from" and "to" value');
+        }
+        transpiledString += limitString;
+      }
+
+      function handleSum() {
+        let sumString = '';
+        let expression = '';
+        let lowerArgAssignment, upperArg;
+        let indexVariable = '';
+
+        if (parsedLatex[index + 1].value !== '_' && parsedLatex[index + 1].value !== '^') {
+          throw new Error('Sum does not contain the correct number of arguments');
+
+        } else {
+          let integrationLimits = handleUpperAndLowerArgsSum(parsedLatex.slice((index + 1)));
+          let lowerArg = integrationLimits.lowerLimit.value;
+          upperArg = integrationLimits.upperLimit;
+          index += 4;
+
+          lowerArg = handleLowerSumArguments(lowerArg);
+          indexVariable = lowerArg.variable;
+          lowerArgAssignment = lowerArg.value;
+
+          logger.debug('Sum: arguments are form ' + lowerArgAssignment + ' to ' + upperArg);
+        }
+
+        if (typeof parsedLatex[index + 1] !== 'undefined') {
+          let {expressionLength: sumLength} = getExpressionLength(parsedLatex.slice((index + 1)), [], ['+', '-', '+-']);
+
+          expression += transpiler(parsedLatex.slice((index + 1), ((index + 1) + sumLength)));
+          index += (sumLength);
+
+        } else {
+          throw new Error('Missing argument in sum');
+        }
+
+        sumString += buildMaximaFunctionString(
+          'sum', expression, indexVariable, lowerArgAssignment, upperArg,
+        );
+
+        transpiledString += sumString;
+      }
+
+      function handleIntegral() {
+        let integralString = '';
+        let expression = '';
+        let lowerLimit, upperLimit;
+        let integrationVariable = '';
+        let integralLength;
+        let isSymbolic = false;
+
+        assertNotUndefined(parsedLatex[index + 1], 'Missing argument in integral');
+
+        if (parsedLatex[index + 1].value !== '_' && parsedLatex[index + 1].value !== '^') {
+          // Symbolic integral
+          logger.debug('Integral is symbolic');
+          isSymbolic = true;
+
+          index++;
+
+        } else {
+          // Finite integral
+          let integralArgs = parsedLatex.slice(index + 1, index + 5);
+          let integrationLimits = handleUpperAndLowerArgs(integralArgs);
+          lowerLimit = integrationLimits.lowerLimit;
+          upperLimit = integrationLimits.upperLimit;
+          logger.debug('Integration limits are from ' + lowerLimit + ' to ' + upperLimit);
+
+          index += 5;
+        }
+
+        let integralEnd = findIntegralEnd(parsedLatex.slice(index));
+
+        integrationVariable += integralEnd.variable;
+        integralLength = integralEnd.length;
+
+        let unTranspiledIntegralLatex = parsedLatex.slice((index), ((index) + integralLength));
+        assertNotUndefined(unTranspiledIntegralLatex[unTranspiledIntegralLatex.length - 1], 'Missing argument in integral');
+
+        if (unTranspiledIntegralLatex[unTranspiledIntegralLatex.length - 1].value === '*') {
+          unTranspiledIntegralLatex.splice(-1, 1);
+        }
+
+        expression += transpiler(unTranspiledIntegralLatex);
+
+        index += (integralLength);
+
+        if (isSymbolic) {
+          integralString += buildMaximaFunctionString(
+            'integrate', expression, integrationVariable,
+          );
+
+        } else {
+          integralString += buildMaximaFunctionString(
+            'integrate', expression, integrationVariable, lowerLimit, upperLimit,
+          );
+
+        }
+
+        transpiledString += integralString;
+      }
+
+    }
+
+    function doEnvironment() {
+      if (item.state === 'begin') {
+
+        addTimesSign(index, {type: 'operator'});
+
+        let expression = '';
+        let envLength = environmentLength(parsedLatex.slice((index)));
+
+        if (isMatrixEnvironment(item.value)) {
+          logger.debug('Found matrix environment');
+          expression += handleMatrix(parsedLatex.slice((index + 1), (index + 1) + envLength));
+        }
+
+        index += (envLength + 1);
+        transpiledString += expression;
+
+      } else if (item.state === 'end') {
+        index++;
+      }
+    }
+  }
+
+  transpiledString += ')';
+
+  if (/(\([ ]*\))/.test(transpiledString)) {
+    throw new Error('Syntax error');
+  }
+
+  if (transpiledString === '') {
+    throw new Error('EMPTY');
+  } //TODO FIX, possibly remove
+
+  return transpiledString;
 }

@@ -8,7 +8,7 @@ import {transpiler} from "../maxima-transpiler";
 import {wrapForTranspilation} from "../../helpers/helpers";
 import {assertNotUndefined} from "./common";
 
-export function handleMatrix(parsedLatex) {
+/*export function handleMatrix(parsedLatex) {
     let matrixString = "";
 
     matrixString += 'matrix(';
@@ -44,4 +44,4 @@ export function handleMatrix(parsedLatex) {
     matrixString += ')';
 
     return matrixString;
-}
+}*/

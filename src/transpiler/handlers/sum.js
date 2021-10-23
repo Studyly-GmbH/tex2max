@@ -6,7 +6,7 @@ import {transpiler} from "../maxima-transpiler";
 import {checkForVariable, wrapForTranspilation} from "../../helpers/helpers";
 import {assertNotUndefined} from "./common";
 
-export function handleUpperAndLowerArgsSum(parsedLatex) {
+/*export function handleUpperAndLowerArgsSum(parsedLatex) {
     let lowerLimit, upperLimit;
     let index = 0;
 
@@ -55,4 +55,4 @@ export function handleLowerSumArguments(parsedLatex) {
         value: value,
     };
 
-}
+}*/
