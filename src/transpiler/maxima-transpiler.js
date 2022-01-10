@@ -57,6 +57,9 @@ export function transpiler(parsedLatex) {
       case 'variable':
         doVariable();
         break;
+      case 'index_word':
+        doUnderscore();
+        break;
       case 'group':
         doGroup();
         break;
@@ -388,6 +391,21 @@ export function transpiler(parsedLatex) {
         variableString += item.value;
       }
 
+      transpiledString += variableString;
+    }
+
+    function doUnderscore() {
+      let variableString = '';
+      if (getName(item.value) !== null) {
+        let letter = getName(item.value);
+        if (options.onlyGreekSymbol) {
+          letter = getSymbol(letter);
+        }
+        logger.debug('greek letter ' + letter);
+        variableString += letter;
+      } else {
+        variableString += item.value;
+      }
       transpiledString += variableString;
     }
 

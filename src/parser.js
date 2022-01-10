@@ -148,11 +148,24 @@ export function parseLatex(tokens) {
         };
     }
 
+    function parseTokens(tokeNames) {
+        logger.debug('- Found letter \"' + getCurrentChar() + '\"');
+        let sequence = "";
+        if (tokeNames.includes(peekType())) {
+            logger.debug(', Continuing parsing');
+            sequence = consume() + parseTokens(tokeNames);
+            logger.debug('Current word: ' + sequence)
+        } else {
+            sequence = consume();
+        }
+        logger.debug('Current sequence: ' + sequence);
+        return sequence;
+    }
+
+    // could be simplified by parseTokens([TOKEN_TYPES.STRING_LITERAL.name])
     function parseWord() {
         logger.debug('- Found letter \"' + getCurrentChar() + '\"');
-
         let sequence = "";
-
         if (peekType() === TOKEN_TYPES.STRING_LITERAL.name) {
             logger.debug(', Continuing parsing');
             sequence = consume() + parseWord(TOKEN_TYPES.STRING_LITERAL.name);
@@ -481,6 +494,31 @@ export function parseLatex(tokens) {
         return node;
     }
 
+    function parseUnderscore() {
+      logger.debug("Found underscore");
+      skipToken(); // skip _
+      skipToken(); // Skip bracket
+      let index_word = parseTokens([
+        TOKEN_TYPES.STRING_LITERAL.name,
+        TOKEN_TYPES.NUMBER_LITERAL.name,
+        TOKEN_TYPES.PERIOD.name,
+        TOKEN_TYPES.COMMA.name,
+        TOKEN_TYPES.UNDERSCORE.name,
+        TOKEN_TYPES.OPENING_PARENTHESES.name,
+        TOKEN_TYPES.CLOSING_PARENTHESES.name,
+        TOKEN_TYPES.OPENING_BRACKET.name,
+        TOKEN_TYPES.CLOSING_BRACKET.name,
+        TOKEN_TYPES.WHITESPACE.name,
+        TOKEN_TYPES.AMPERSAND.name,
+        TOKEN_TYPES.OPERATOR.name,
+        TOKEN_TYPES.BACKSLASH.name,
+      ]);
+      skipToken(); // Skip bracket
+      return {
+        type: 'index_word',
+        value: '_{' + index_word + '}'
+      };
+    }
 
     function parseOperator() {
         logger.debug("Found operator");
@@ -541,6 +579,10 @@ export function parseLatex(tokens) {
                 logger.debug('Found OPERATOR \"' + getCurrentChar() + '\"');
                 parsedResult = parseOperator();
                 break;
+            case TOKEN_TYPES.UNDERSCORE:
+              logger.debug('Found UNDERSCORE \"' + getCurrentChar() + '\"');
+              parsedResult = parseUnderscore();
+              break;
             case TOKEN_TYPES.STRING_LITERAL:
                 logger.debug('Found STRING_LITERAL \"' + getCurrentChar() + '\"');
                 parsedResult = parseVariable();

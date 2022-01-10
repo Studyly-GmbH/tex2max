@@ -77,6 +77,15 @@ export const TOKEN_TYPES = {
     OPERATOR: {
         name: 'OPERATOR',
         symbol: null,
-        regex: /^[+\-*/=^_!<>]$/i
+        regex: /^[+\-*/=^!<>]$/i
+    },
+  // TODO: this is a quick-fix for index-notations.
+  //  the index-part shall be part of the variable although
+  //  the variable has a constraint for single-char-variables which conflicts with that
+  //  it is also not clear how _ is processed by maxima
+    UNDERSCORE: {
+      name: 'UNDERSCORE',
+      symbol: null,
+      regex: /^[_]$/i
     },
 };
