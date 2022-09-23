@@ -72,7 +72,7 @@ export const TOKEN_TYPES = {
     STRING_LITERAL: {
         name: "STRING_LITERAL",
         symbol: null,
-        regex: /^[a-zA-Zα-ωΑ-Ω]+$/iu
+        regex: /^[a-zA-Zα-ωΑ-ΩäöüßÄÖÜ]+$/iu
     },
     OPERATOR: {
         name: 'OPERATOR',
