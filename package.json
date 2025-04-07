@@ -5,8 +5,8 @@
   "main": "lib/tex2max.common.js",
   "unpkg": "lib/tex2max.js",
   "scripts": {
-    "build": "parallel-webpack",
-    "build:watch": "parallel-webpack --watch",
+    "build": "webpack",
+    "build:watch": "webpack --watch",
     "test": "ava",
     "test:watch": "ava --watch"
   },
@@ -37,11 +37,10 @@
     "@babel/core": "^7.6.4",
     "@babel/preset-env": "^7.6.3",
     "@babel/register": "^7.6.2",
-    "ava": "^1.4.1",
+    "ava": "^6.2.0",
     "babel-loader": "^8.0.6",
-    "parallel-webpack": "^2.4.0",
-    "webpack": "^4.41.2",
-    "webpack-cli": "^3.3.9"
+    "webpack": "^5.98.0",
+    "webpack-cli": "^5.1.4"
   },
   "dependencies": {
     "ajv": "^6.10.2"

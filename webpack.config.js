@@ -1,8 +1,8 @@
 const webpack = require("webpack");
-const createVariants = require('parallel-webpack').createVariants;
 const path = require("path");
 const pkg = require('./package.json');
 const mode = 'production';
+const TerserPlugin = require('terser-webpack-plugin');
 
 const timeStamp = new Date().toLocaleTimeString();
 const date = new Date();
@@ -39,35 +39,40 @@ let umdConfig = {
     },
     plugins: [
         new webpack.BannerPlugin({banner: banner}),
-    ]
+    ],
+    optimization: {
+        minimizer: [
+            new TerserPlugin({
+                extractComments: false,
+            }),
+        ],
+    },
 };
 
 function getFileExtension(libraryTarget) {
-    let fileExtention = "";
+    let fileExtension = "";
     switch (libraryTarget) {
         case "commonjs2":
-            fileExtention = "common";
+            fileExtension = "common";
             break;
-        default :
-            fileExtention = libraryTarget;
+        default:
+            fileExtension = libraryTarget;
             break;
     }
-    return fileExtention;
+    return fileExtension;
 }
 
 function createConfig(options) {
     let plugins = [
         new webpack.BannerPlugin({banner: banner}),
     ];
-    let fileExtention = getFileExtension(options.libraryTarget);
+    let fileExtension = getFileExtension(options.libraryTarget);
     return {
         mode: mode,
         entry: './src/index.js',
         output: {
             path: path.resolve(__dirname, "lib"),
-            filename: 'tex2max.' +
-            fileExtention
-            + '.js',
+            filename: `tex2max.${fileExtension}.js`,
             libraryExport: 'default',
             libraryTarget: options.libraryTarget,
             umdNamedDefine: true,
@@ -84,14 +89,20 @@ function createConfig(options) {
                 }
             ]
         },
-        plugins: plugins
+        plugins: plugins,
+        optimization: {
+            minimizer: [
+                new TerserPlugin({
+                    extractComments: false, // Prevents creating a separate license file
+                }),
+            ],
+        },
     };
 }
 
-let variants = {
-    libraryTarget: ['commonjs2', 'amd']
-};
+// Manually create the variant configurations.
+const commonjsConfig = createConfig({ libraryTarget: 'commonjs2' });
+const amdConfig = createConfig({ libraryTarget: 'amd' });
 
-let variantsConfig = createVariants(variants, createConfig);
-
-module.exports = [...variantsConfig, umdConfig];
+// Export all configs as an array.
+module.exports = [commonjsConfig, amdConfig, umdConfig];
