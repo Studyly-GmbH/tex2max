@@ -494,8 +494,12 @@ export function transpiler(parsedLatex) {
             logger.debug('Found function nth-square root');
             let nthArgString = transpiler(parsedLatex[index + 1].value);
 
-            sqrtString += transpiler(parsedLatex[index + 2].value);
-            sqrtString += '^(1/' + nthArgString + ')';
+            // Old transpiler from /sqrt[n]{x} to x^(1/n)
+            // sqrtString += transpiler(parsedLatex[index + 2].value);
+            // sqrtString += '^(1/' + nthArgString + ')';
+
+            // New transpiler from /sqrt[n]{x} to root(x,n)
+            sqrtString += `root(${transpiler(parsedLatex[index + 2].value)},${nthArgString})`;
             index++;
 
           } else {
