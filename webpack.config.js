@@ -2,7 +2,7 @@ const webpack = require("webpack");
 const path = require("path");
 const pkg = require('./package.json');
 const mode = 'production';
-const TerserPlugin = require('terser-webpack-plugin');
+const TerserPlugin = require('minimizer-webpack-plugin');
 
 const timeStamp = new Date().toLocaleTimeString();
 const date = new Date();
