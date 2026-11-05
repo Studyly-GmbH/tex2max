@@ -1,6 +1,10 @@
 {
   "name": "tex2max",
   "version": "1.3.1",
+  "engines": {
+    "node": "^24.15.0",
+    "npm": ">=11.19.1"
+  },
   "description": "LaTeX math to Maxima code converter",
   "main": "lib/tex2max.common.js",
   "unpkg": "lib/tex2max.js",
@@ -44,5 +48,8 @@
   },
   "dependencies": {
     "ajv": "^8.17.1"
+  },
+  "allowScripts": {
+    "fsevents@2.3.3": false
   }
 }
