@@ -50,6 +50,6 @@
     "ajv": "^8.20.0"
   },
   "allowScripts": {
-    "fsevents@2.3.3": false
+    "fsevents": false
   }
 }

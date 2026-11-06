@@ -9,9 +9,10 @@ updates:
       day: monday
       time: '06:00'
       timezone: Europe/Vienna
-    # Must stay >= min-release-age in .npmrc, otherwise npm rejects the version Dependabot picked
+    # Must stay > min-release-age in .npmrc, otherwise npm rejects the version Dependabot picked
+    # (one day margin: npm counts exact 24h periods while Dependabot runs at a fixed time)
     cooldown:
-      default-days: 14
+      default-days: 15
     groups:
       minor-and-patch:
         patterns:
