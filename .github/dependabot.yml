@@ -1,0 +1,40 @@
+version: 2
+
+updates:
+  - package-ecosystem: npm
+    directory: /
+    target-branch: testing
+    schedule:
+      interval: weekly
+      day: monday
+      time: '06:00'
+      timezone: Europe/Vienna
+    # Must stay > min-release-age in .npmrc, otherwise npm rejects the version Dependabot picked
+    # (one day margin: npm counts exact 24h periods while Dependabot runs at a fixed time)
+    cooldown:
+      default-days: 15
+    groups:
+      minor-and-patch:
+        patterns:
+          - '*'
+        update-types:
+          - minor
+          - patch
+    ignore:
+      # Majors need code/config migrations Dependabot can't do; they are done together during the Angular update
+      - dependency-name: '*'
+        update-types:
+          - version-update:semver-major
+
+  - package-ecosystem: github-actions
+    directory: /
+    target-branch: testing
+    schedule:
+      interval: weekly
+      day: monday
+      time: '06:00'
+      timezone: Europe/Vienna
+    groups:
+      github-actions:
+        patterns:
+          - '*'
